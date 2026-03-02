@@ -20,9 +20,9 @@ import java.util.concurrent.CompletableFuture;
 
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Lock;
+import io.etcd.jetcd.api.lock.LockGrpc;
 import io.etcd.jetcd.api.lock.LockRequest;
 import io.etcd.jetcd.api.lock.UnlockRequest;
-import io.etcd.jetcd.api.lock.VertxLockGrpc;
 import io.etcd.jetcd.lock.LockResponse;
 import io.etcd.jetcd.lock.UnlockResponse;
 import io.etcd.jetcd.support.Errors;
@@ -31,7 +31,7 @@ import io.etcd.jetcd.support.Util;
 import static java.util.Objects.requireNonNull;
 
 final class LockImpl extends Impl implements Lock {
-    private final VertxLockGrpc.LockVertxStub stub;
+    private final LockGrpc.LockFutureStub stub;
     private final ByteSequence namespace;
 
     // Lock operations are done in a context where a client is trying to implement
@@ -46,14 +46,14 @@ final class LockImpl extends Impl implements Lock {
     // (a) know (b) retry on a different server.
     // The retry on a different server should happen automatically if the connection manager is using
     // a round robin strategy.
-    private VertxLockGrpc.LockVertxStub stubWithLeader() {
+    private LockGrpc.LockFutureStub stubWithLeader() {
         return Util.applyRequireLeader(true, stub);
     }
 
     LockImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(VertxLockGrpc::newVertxStub);
+        this.stub = connectionManager.newStub(LockGrpc::newFutureStub);
         this.namespace = connectionManager.getNamespace();
     }
 

@@ -22,12 +22,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.etcd.jetcd.Cluster;
+import io.etcd.jetcd.api.ClusterGrpc;
 import io.etcd.jetcd.api.MemberAddRequest;
 import io.etcd.jetcd.api.MemberListRequest;
 import io.etcd.jetcd.api.MemberPromoteRequest;
 import io.etcd.jetcd.api.MemberRemoveRequest;
 import io.etcd.jetcd.api.MemberUpdateRequest;
-import io.etcd.jetcd.api.VertxClusterGrpc;
 import io.etcd.jetcd.cluster.MemberAddResponse;
 import io.etcd.jetcd.cluster.MemberListResponse;
 import io.etcd.jetcd.cluster.MemberPromoteResponse;
@@ -39,12 +39,12 @@ import io.etcd.jetcd.cluster.MemberUpdateResponse;
  */
 final class ClusterImpl extends Impl implements Cluster {
 
-    private final VertxClusterGrpc.ClusterVertxStub stub;
+    private final ClusterGrpc.ClusterFutureStub stub;
 
     ClusterImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(VertxClusterGrpc::newVertxStub);
+        this.stub = connectionManager.newStub(ClusterGrpc::newFutureStub);
     }
 
     /**

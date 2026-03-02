@@ -21,10 +21,10 @@ import java.util.concurrent.CompletableFuture;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Election;
 import io.etcd.jetcd.api.CampaignRequest;
+import io.etcd.jetcd.api.ElectionGrpc;
 import io.etcd.jetcd.api.LeaderRequest;
 import io.etcd.jetcd.api.ProclaimRequest;
 import io.etcd.jetcd.api.ResignRequest;
-import io.etcd.jetcd.api.VertxElectionGrpc;
 import io.etcd.jetcd.election.CampaignResponse;
 import io.etcd.jetcd.election.LeaderKey;
 import io.etcd.jetcd.election.LeaderResponse;
@@ -35,6 +35,7 @@ import io.etcd.jetcd.election.ResignResponse;
 import io.etcd.jetcd.support.Errors;
 import io.etcd.jetcd.support.Util;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.StreamObserver;
 
 import com.google.protobuf.ByteString;
 
@@ -42,13 +43,15 @@ import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.toEtcdExceptio
 import static java.util.Objects.requireNonNull;
 
 final class ElectionImpl extends Impl implements Election {
-    private final VertxElectionGrpc.ElectionVertxStub stub;
+    private final ElectionGrpc.ElectionFutureStub stub;
+    private final ElectionGrpc.ElectionStub stubAsync;
     private final ByteSequence namespace;
 
     ElectionImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(VertxElectionGrpc::newVertxStub);
+        this.stub = connectionManager.newStub(ElectionGrpc::newFutureStub);
+        this.stubAsync = connectionManager.newStub(ElectionGrpc::newStub);
         this.namespace = connectionManager.getNamespace();
     }
 
@@ -69,8 +72,12 @@ final class ElectionImpl extends Impl implements Election {
     // In the paragraph above when we say "raft-leader" we are talking about the etcd server that is a leader
     // of the etcd servers cluster according to raft, we are not talking about the client that
     // happens to be the leader of an election using the election API in this file.
-    private VertxElectionGrpc.ElectionVertxStub stubWithLeader() {
+    private ElectionGrpc.ElectionFutureStub stubWithLeader() {
         return Util.applyRequireLeader(true, stub);
+    }
+
+    private ElectionGrpc.ElectionStub stubAsyncWithLeader() {
+        return Util.applyRequireLeader(true, stubAsync);
     }
 
     @Override
@@ -138,10 +145,22 @@ final class ElectionImpl extends Impl implements Election {
             .setName(Util.prefixNamespace(electionName, namespace))
             .build();
 
-        stubWithLeader().observeWithHandler(request,
-            value -> listener.onNext(new LeaderResponse(value, namespace)),
-            ignored -> listener.onCompleted(),
-            error -> listener.onError(toEtcdException(error)));
+        stubAsyncWithLeader().observe(request, new StreamObserver<io.etcd.jetcd.api.LeaderResponse>() {
+            @Override
+            public void onNext(io.etcd.jetcd.api.LeaderResponse value) {
+                listener.onNext(new LeaderResponse(value, namespace));
+            }
+
+            @Override
+            public void onCompleted() {
+                listener.onCompleted();
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                listener.onError(toEtcdException(error));
+            }
+        });
     }
 
     @Override

@@ -1,6 +1,9 @@
 package io.etcd.jetcd.impl;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -11,7 +14,8 @@ import org.slf4j.LoggerFactory;
 import io.etcd.jetcd.common.exception.EtcdExceptionFactory;
 import io.etcd.jetcd.support.Errors;
 import io.grpc.Status;
-import io.vertx.core.Future;
+
+import com.google.common.util.concurrent.ListenableFuture;
 
 import dev.failsafe.Failsafe;
 import dev.failsafe.RetryPolicy;
@@ -38,57 +42,56 @@ abstract class Impl {
     }
 
     /**
-     * Converts Future of Type S to CompletableFuture of Type T.
+     * Converts a ListenableFuture of Type S to CompletableFuture of Type T.
      *
-     * @param  sourceFuture  the Future to wrap
+     * @param  sourceFuture  the ListenableFuture to wrap
      * @param  resultConvert the result converter
-     * @return               a {@link CompletableFuture} wrapping the given {@link Future}
+     * @return               a {@link CompletableFuture} wrapping the given future
      */
-    protected <S, T> CompletableFuture<T> completable(Future<S> sourceFuture, Function<S, T> resultConvert) {
+    protected <S, T> CompletableFuture<T> completable(ListenableFuture<S> sourceFuture, Function<S, T> resultConvert) {
         return completable(sourceFuture, resultConvert, EtcdExceptionFactory::toEtcdException);
     }
 
     /**
-     * Converts Future of Type S to CompletableFuture of Type T.
+     * Converts a ListenableFuture of Type S to CompletableFuture of Type T.
      *
-     * @param  sourceFuture       the Future to wrap
+     * @param  sourceFuture       the ListenableFuture to wrap
      * @param  resultConvert      the result converter
      * @param  exceptionConverter the exception mapper
-     * @return                    a {@link CompletableFuture} wrapping the given {@link Future}
+     * @return                    a {@link CompletableFuture} wrapping the given future
      */
     protected <S, T> CompletableFuture<T> completable(
-        Future<S> sourceFuture,
+        ListenableFuture<S> sourceFuture,
         Function<S, T> resultConvert,
         Function<Throwable, Throwable> exceptionConverter) {
 
-        return completable(
-            sourceFuture.compose(
-                r -> Future.succeededFuture(resultConvert.apply(r)),
-                e -> Future.failedFuture(exceptionConverter.apply(e))));
-    }
-
-    /**
-     * Converts Future of Type S to CompletableFuture of Type T.
-     *
-     * @param  sourceFuture the Future to wrap
-     * @return              a {@link CompletableFuture} wrapping the given {@link Future}
-     */
-    protected <S> CompletableFuture<S> completable(
-        Future<S> sourceFuture) {
-        return sourceFuture.toCompletionStage().toCompletableFuture();
+        CompletableFuture<T> cf = new CompletableFuture<>();
+        sourceFuture.addListener(() -> {
+            try {
+                cf.complete(resultConvert.apply(sourceFuture.get()));
+            } catch (ExecutionException e) {
+                cf.completeExceptionally(exceptionConverter.apply(e.getCause()));
+            } catch (CancellationException e) {
+                cf.cancel(false);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                cf.completeExceptionally(exceptionConverter.apply(e));
+            }
+        }, Runnable::run);
+        return cf;
     }
 
     /**
      * execute the task and retry it in case of failure.
      *
-     * @param  supplier      a function that returns a new Future.
+     * @param  supplier      a function that returns a new ListenableFuture.
      * @param  resultConvert a function that converts Type S to Type T.
      * @param  <S>           Source type
      * @param  <T>           Converted Type.
      * @return               a CompletableFuture with type T.
      */
     protected <S, T> CompletableFuture<T> execute(
-        Supplier<Future<S>> supplier,
+        Supplier<ListenableFuture<S>> supplier,
         Function<S, T> resultConvert,
         boolean autoRetry) {
 
@@ -99,7 +102,7 @@ abstract class Impl {
     /**
      * execute the task and retry it in case of failure.
      *
-     * @param  supplier      a function that returns a new Future.
+     * @param  supplier      a function that returns a new ListenableFuture.
      * @param  resultConvert a function that converts Type S to Type T.
      * @param  doRetry       a predicate to determine if a failure has to be retried
      * @param  <S>           Source type
@@ -107,14 +110,14 @@ abstract class Impl {
      * @return               a CompletableFuture with type T.
      */
     protected <S, T> CompletableFuture<T> execute(
-        Supplier<Future<S>> supplier,
+        Supplier<ListenableFuture<S>> supplier,
         Function<S, T> resultConvert,
         Predicate<Status> doRetry) {
 
         return Failsafe
             .with(retryPolicy(doRetry))
             .with(connectionManager.getExecutorService())
-            .getStageAsync(() -> supplier.get().toCompletionStage())
+            .getStageAsync(() -> toCompletionStage(supplier.get()))
             .thenApply(resultConvert);
     }
 
@@ -156,5 +159,22 @@ abstract class Impl {
         }
 
         return policy.build();
+    }
+
+    private static <S> CompletionStage<S> toCompletionStage(ListenableFuture<S> future) {
+        CompletableFuture<S> cf = new CompletableFuture<>();
+        future.addListener(() -> {
+            try {
+                cf.complete(future.get());
+            } catch (ExecutionException e) {
+                cf.completeExceptionally(e.getCause());
+            } catch (CancellationException e) {
+                cf.cancel(false);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                cf.completeExceptionally(e);
+            }
+        }, Runnable::run);
+        return cf;
     }
 }

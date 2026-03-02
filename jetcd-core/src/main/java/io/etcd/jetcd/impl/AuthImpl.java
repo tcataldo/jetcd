@@ -22,6 +22,7 @@ import io.etcd.jetcd.Auth;
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.api.AuthDisableRequest;
 import io.etcd.jetcd.api.AuthEnableRequest;
+import io.etcd.jetcd.api.AuthGrpc;
 import io.etcd.jetcd.api.AuthRoleAddRequest;
 import io.etcd.jetcd.api.AuthRoleDeleteRequest;
 import io.etcd.jetcd.api.AuthRoleGetRequest;
@@ -35,7 +36,6 @@ import io.etcd.jetcd.api.AuthUserGetRequest;
 import io.etcd.jetcd.api.AuthUserGrantRoleRequest;
 import io.etcd.jetcd.api.AuthUserListRequest;
 import io.etcd.jetcd.api.AuthUserRevokeRoleRequest;
-import io.etcd.jetcd.api.VertxAuthGrpc;
 import io.etcd.jetcd.auth.AuthDisableResponse;
 import io.etcd.jetcd.auth.AuthEnableResponse;
 import io.etcd.jetcd.auth.AuthRoleAddResponse;
@@ -62,12 +62,12 @@ import static java.util.Objects.requireNonNull;
  */
 final class AuthImpl extends Impl implements Auth {
 
-    private final VertxAuthGrpc.AuthVertxStub stub;
+    private final AuthGrpc.AuthFutureStub stub;
 
     AuthImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(VertxAuthGrpc::newVertxStub);
+        this.stub = connectionManager.newStub(AuthGrpc::newFutureStub);
     }
 
     @Override

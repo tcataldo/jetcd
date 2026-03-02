@@ -19,6 +19,7 @@ package io.etcd.jetcd.impl;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,8 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.Watch;
-import io.etcd.jetcd.api.VertxWatchGrpc;
 import io.etcd.jetcd.api.WatchCreateRequest;
+import io.etcd.jetcd.api.WatchGrpc;
 import io.etcd.jetcd.api.WatchProgressRequest;
 import io.etcd.jetcd.api.WatchRequest;
 import io.etcd.jetcd.api.WatchResponse;
@@ -41,14 +42,9 @@ import io.etcd.jetcd.support.Errors;
 import io.etcd.jetcd.support.Util;
 import io.grpc.Status;
 import io.grpc.stub.ClientCallStreamObserver;
-import io.vertx.core.streams.WriteStream;
-import io.vertx.grpc.stub.GrpcWriteStream;
+import io.grpc.stub.StreamObserver;
 
 import com.google.common.base.Strings;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 
 import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.newClosedWatchClientException;
 import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.newCompactedException;
@@ -62,8 +58,8 @@ final class WatchImpl extends Impl implements Watch {
     private static final Logger LOG = LoggerFactory.getLogger(WatchImpl.class);
 
     private final Object lock;
-    private final VertxWatchGrpc.WatchVertxStub stub;
-    private final ListeningScheduledExecutorService executor;
+    private final WatchGrpc.WatchStub stub;
+    private final ScheduledExecutorService executor;
     private final AtomicBoolean closed;
     private final List<WatcherImpl> watchers;
     private final ByteSequence namespace;
@@ -72,10 +68,9 @@ final class WatchImpl extends Impl implements Watch {
         super(connectionManager);
 
         this.lock = new Object();
-        this.stub = connectionManager.newStub(VertxWatchGrpc::newVertxStub);
+        this.stub = connectionManager.newStub(WatchGrpc::newStub);
         // set it to daemon as there is no way for users to create this thread pool by their own
-        this.executor = MoreExecutors.listeningDecorator(
-            Executors.newScheduledThreadPool(1, Util.createThreadFactory("jetcd-watch-", true)));
+        this.executor = Executors.newScheduledThreadPool(1, Util.createThreadFactory("jetcd-watch-", true));
         this.closed = new AtomicBoolean();
         this.watchers = new CopyOnWriteArrayList<>();
         this.namespace = connectionManager.getNamespace();
@@ -124,10 +119,9 @@ final class WatchImpl extends Impl implements Watch {
         private final Listener listener;
         private final AtomicBoolean closed;
 
-        private final AtomicReference<WriteStream<WatchRequest>> wstream;
+        private final AtomicReference<StreamObserver<WatchRequest>> wstream;
         private final AtomicBoolean started;
         private long revision;
-        private long id;
 
         WatcherImpl(ByteSequence key, WatchOption option, Listener listener) {
             this.key = key;
@@ -137,7 +131,6 @@ final class WatchImpl extends Impl implements Watch {
 
             this.started = new AtomicBoolean();
             this.wstream = new AtomicReference<>();
-            this.id = -1;
             this.revision = this.option.getRevision();
         }
 
@@ -158,9 +151,6 @@ final class WatchImpl extends Impl implements Watch {
             }
 
             if (started.compareAndSet(false, true)) {
-                // id is not really useful today, but it may be in etcd 3.4
-                id = -1;
-
                 WatchCreateRequest.Builder builder = WatchCreateRequest.newBuilder()
                     .setKey(Util.prefixNamespace(this.key, namespace))
                     .setPrevKv(this.option.isPrevKV())
@@ -183,15 +173,27 @@ final class WatchImpl extends Impl implements Watch {
                     builder.addFilters(WatchCreateRequest.FilterType.NOPUT);
                 }
 
-                var ignored = Util.applyRequireLeader(option.withRequireLeader(), stub)
-                    .watchWithHandler(
-                        stream -> {
-                            wstream.set(stream);
-                            stream.write(WatchRequest.newBuilder().setCreateRequest(builder).build());
-                        },
-                        this::onNext,
-                        event -> onCompleted(),
-                        this::onError);
+                WatchRequest createRequest = WatchRequest.newBuilder().setCreateRequest(builder).build();
+
+                StreamObserver<WatchRequest> requestObserver = Util.applyRequireLeader(option.withRequireLeader(), stub)
+                    .watch(new StreamObserver<WatchResponse>() {
+                        @Override
+                        public void onNext(WatchResponse value) {
+                            WatcherImpl.this.onNext(value);
+                        }
+
+                        @Override
+                        public void onError(Throwable t) {
+                            WatcherImpl.this.onError(t);
+                        }
+
+                        @Override
+                        public void onCompleted() {
+                            WatcherImpl.this.onCompleted();
+                        }
+                    });
+                wstream.set(requestObserver);
+                requestObserver.onNext(createRequest);
             }
         }
 
@@ -201,19 +203,10 @@ final class WatchImpl extends Impl implements Watch {
             // sync with onError()
             synchronized (WatchImpl.this.lock) {
                 if (closed.compareAndSet(false, true)) {
-                    if (wstream.get() != null) {
-                        WriteStream<WatchRequest> ws = wstream.get();
-                        if (ws instanceof GrpcWriteStream<?>) {
-                            GrpcWriteStream<?> gws = (GrpcWriteStream<?>) ws;
-                            var observer = gws.streamObserver();
-                            if (observer instanceof ClientCallStreamObserver<?>) {
-                                ClientCallStreamObserver<?> callObs = (ClientCallStreamObserver<?>) observer;
-                                callObs.cancel("Watcher cancelled", null);
-                            }
-                        }
+                    StreamObserver<WatchRequest> ws = wstream.get();
+                    if (ws instanceof ClientCallStreamObserver<?>) {
+                        ((ClientCallStreamObserver<?>) ws).cancel("Watcher cancelled", null);
                     }
-
-                    id = -1;
 
                     listener.onCompleted();
 
@@ -227,7 +220,7 @@ final class WatchImpl extends Impl implements Watch {
         public void requestProgress() {
             if (!closed.get() && wstream.get() != null) {
                 WatchProgressRequest watchProgressRequest = WatchProgressRequest.newBuilder().build();
-                wstream.get().write(WatchRequest.newBuilder().setProgressRequest(watchProgressRequest).build());
+                wstream.get().onNext(WatchRequest.newBuilder().setProgressRequest(watchProgressRequest).build());
             }
         }
 
@@ -265,7 +258,6 @@ final class WatchImpl extends Impl implements Watch {
                 }
 
                 revision = Math.max(revision, response.getHeader().getRevision());
-                id = response.getWatchId();
                 if (option.isCreatedNotify()) {
                     listener.onNext(new io.etcd.jetcd.watch.WatchResponse(response));
                 }
@@ -332,8 +324,9 @@ final class WatchImpl extends Impl implements Watch {
                 }
 
                 listener.onError(etcdException);
-                if (wstream.get() != null) {
-                    wstream.get().end();
+                StreamObserver<WatchRequest> ws = wstream.get();
+                if (ws != null) {
+                    ws.onCompleted();
                 }
                 wstream.set(null);
                 started.set(false);
@@ -354,17 +347,15 @@ final class WatchImpl extends Impl implements Watch {
             return !Errors.isHaltError(status) && !Errors.isNoLeaderError(status);
         }
 
+        @SuppressWarnings("FutureReturnValueIgnored")
         private void reschedule() {
-            Futures.addCallback(executor.schedule(this::resume, 500, TimeUnit.MILLISECONDS), new FutureCallback<Object>() {
-                @Override
-                public void onFailure(Throwable t) {
+            executor.schedule(() -> {
+                try {
+                    resume();
+                } catch (Throwable t) {
                     LOG.warn("scheduled resume failed", t);
                 }
-
-                @Override
-                public void onSuccess(Object result) {
-                }
-            }, executor);
+            }, 500, TimeUnit.MILLISECONDS);
         }
     }
 }

@@ -18,17 +18,20 @@ package io.etcd.jetcd.impl;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 
+import io.etcd.jetcd.api.AuthGrpc;
 import io.etcd.jetcd.api.AuthenticateRequest;
-import io.etcd.jetcd.api.VertxAuthGrpc;
+import io.etcd.jetcd.api.AuthenticateResponse;
 import io.grpc.CallCredentials;
 import io.grpc.ClientInterceptor;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.stub.MetadataUtils;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 
 import static io.etcd.jetcd.Preconditions.checkArgument;
@@ -67,7 +70,7 @@ class AuthCredential extends CallCredentials {
         checkArgument(!manager.builder().user().isEmpty(), "username can not be empty.");
         checkArgument(!manager.builder().password().isEmpty(), "password can not be empty.");
 
-        VertxAuthGrpc.AuthVertxStub authFutureStub = VertxAuthGrpc.newVertxStub(this.manager.getChannel());
+        AuthGrpc.AuthFutureStub authFutureStub = AuthGrpc.newFutureStub(this.manager.getChannel());
 
         List<ClientInterceptor> interceptorsChain = new ArrayList<>();
         if (manager.builder().authHeaders() != null) {
@@ -94,18 +97,20 @@ class AuthCredential extends CallCredentials {
             .build();
 
         try {
-            authFutureStub.authenticate(request)
-                .onFailure(t -> {
-                    applier.fail(Status.UNAUTHENTICATED.withCause(t));
-                })
-                .onSuccess(h -> {
+            ListenableFuture<AuthenticateResponse> future = authFutureStub.authenticate(request);
+            future.addListener(() -> {
+                try {
+                    AuthenticateResponse h = future.get();
                     Metadata meta = new Metadata();
                     meta.put(TOKEN, h.getToken());
-
                     this.meta = meta;
-
                     applier.apply(this.meta);
-                });
+                } catch (ExecutionException e) {
+                    applier.fail(Status.UNAUTHENTICATED.withCause(e.getCause()));
+                } catch (Exception e) {
+                    applier.fail(Status.UNAUTHENTICATED.withCause(e));
+                }
+            }, Runnable::run);
         } catch (Exception e) {
             applier.fail(Status.UNAUTHENTICATED.withCause(e));
         }

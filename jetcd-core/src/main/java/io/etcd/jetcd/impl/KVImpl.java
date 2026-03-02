@@ -22,7 +22,7 @@ import io.etcd.jetcd.ByteSequence;
 import io.etcd.jetcd.KV;
 import io.etcd.jetcd.Txn;
 import io.etcd.jetcd.api.CompactionRequest;
-import io.etcd.jetcd.api.VertxKVGrpc;
+import io.etcd.jetcd.api.KVGrpc;
 import io.etcd.jetcd.kv.CompactResponse;
 import io.etcd.jetcd.kv.DeleteResponse;
 import io.etcd.jetcd.kv.GetResponse;
@@ -43,13 +43,13 @@ import static java.util.Objects.requireNonNull;
  * Implementation of etcd kv client.
  */
 final class KVImpl extends Impl implements KV {
-    private final VertxKVGrpc.KVVertxStub stub;
+    private final KVGrpc.KVFutureStub stub;
     private final ByteSequence namespace;
 
     KVImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(VertxKVGrpc::newVertxStub);
+        this.stub = connectionManager.newStub(KVGrpc::newFutureStub);
         this.namespace = connectionManager.getNamespace();
     }
 

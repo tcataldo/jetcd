@@ -38,12 +38,14 @@ import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.toEtcdExceptio
  * Implementation of maintenance client.
  */
 final class MaintenanceImpl extends Impl implements Maintenance {
-    private final VertxMaintenanceGrpc.MaintenanceVertxStub stub;
+    private final MaintenanceGrpc.MaintenanceFutureStub stub;
+    private final MaintenanceGrpc.MaintenanceStub stubAsync;
 
     MaintenanceImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager().newStub(VertxMaintenanceGrpc::newVertxStub);
+        this.stub = connectionManager().newStub(MaintenanceGrpc::newFutureStub);
+        this.stubAsync = connectionManager().newStub(MaintenanceGrpc::newStub);
     }
 
     @Override
@@ -75,24 +77,16 @@ final class MaintenanceImpl extends Impl implements Maintenance {
     public CompletableFuture<DefragmentResponse> defragmentMember(String target) {
         return this.connectionManager().withNewChannel(
             target,
-            VertxMaintenanceGrpc::newVertxStub,
-            stub -> {
-                return stub.defragment(DefragmentRequest.getDefaultInstance())
-                    .map(DefragmentResponse::new)
-                    .toCompletionStage().toCompletableFuture();
-            });
+            MaintenanceGrpc::newFutureStub,
+            stub -> completable(stub.defragment(DefragmentRequest.getDefaultInstance()), DefragmentResponse::new));
     }
 
     @Override
     public CompletableFuture<StatusResponse> statusMember(String target) {
         return this.connectionManager().withNewChannel(
             target,
-            VertxMaintenanceGrpc::newVertxStub,
-            stub -> {
-                return stub.status(StatusRequest.getDefaultInstance())
-                    .map(StatusResponse::new)
-                    .toCompletionStage().toCompletableFuture();
-            });
+            MaintenanceGrpc::newFutureStub,
+            stub -> completable(stub.status(StatusRequest.getDefaultInstance()), StatusResponse::new));
     }
 
     @Override
@@ -106,12 +100,8 @@ final class MaintenanceImpl extends Impl implements Maintenance {
     public CompletableFuture<HashKVResponse> hashKV(String target, long rev) {
         return this.connectionManager().withNewChannel(
             target,
-            VertxMaintenanceGrpc::newVertxStub,
-            stub -> {
-                return stub.hashKV(HashKVRequest.newBuilder().setRevision(rev).build())
-                    .map(HashKVResponse::new)
-                    .toCompletionStage().toCompletableFuture();
-            });
+            MaintenanceGrpc::newFutureStub,
+            stub -> completable(stub.hashKV(HashKVRequest.newBuilder().setRevision(rev).build()), HashKVResponse::new));
     }
 
     @Override
@@ -119,33 +109,48 @@ final class MaintenanceImpl extends Impl implements Maintenance {
         final CompletableFuture<Long> answer = new CompletableFuture<>();
         final AtomicLong bytes = new AtomicLong(0);
 
-        this.stub.snapshotWithHandler(
-            SnapshotRequest.getDefaultInstance(),
-            r -> {
+        this.stubAsync.snapshot(SnapshotRequest.getDefaultInstance(), new StreamObserver<SnapshotResponse>() {
+            @Override
+            public void onNext(SnapshotResponse r) {
                 try {
                     r.getBlob().writeTo(outputStream);
                     bytes.addAndGet(r.getBlob().size());
                 } catch (IOException e) {
                     answer.completeExceptionally(toEtcdException(e));
                 }
-            },
-            event -> {
+            }
+
+            @Override
+            public void onCompleted() {
                 answer.complete(bytes.get());
-            },
-            e -> {
+            }
+
+            @Override
+            public void onError(Throwable e) {
                 answer.completeExceptionally(toEtcdException(e));
-            });
+            }
+        });
 
         return answer;
     }
 
     @Override
     public void snapshot(StreamObserver<io.etcd.jetcd.maintenance.SnapshotResponse> observer) {
+        this.stubAsync.snapshot(SnapshotRequest.getDefaultInstance(), new StreamObserver<SnapshotResponse>() {
+            @Override
+            public void onNext(SnapshotResponse r) {
+                observer.onNext(new io.etcd.jetcd.maintenance.SnapshotResponse(r));
+            }
 
-        this.stub.snapshotWithHandler(
-            SnapshotRequest.getDefaultInstance(),
-            r -> observer.onNext(new io.etcd.jetcd.maintenance.SnapshotResponse(r)),
-            event -> observer.onCompleted(),
-            e -> observer.onError(toEtcdException(e)));
+            @Override
+            public void onCompleted() {
+                observer.onCompleted();
+            }
+
+            @Override
+            public void onError(Throwable e) {
+                observer.onError(toEtcdException(e));
+            }
+        });
     }
 }
