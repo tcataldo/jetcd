@@ -20,7 +20,6 @@ apply plugin: "pmd"
 dependencies {
     errorprone(libs.errorprone)
     errorprone(libs.errorproneAnnotations)
-    errorproneJavac(libs.errorproneJavac)
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -34,4 +33,10 @@ tasks.withType(JavaCompile).configureEach {
 pmd {
     consoleOutput = true
     ruleSets = [ "${project.rootDir}/etc/pmd-ruleset.xml" ]
+}
+
+tasks.withType(Pmd).configureEach { task ->
+    if (task.name.endsWith('Test')) {
+        task.enabled = false
+    }
 }

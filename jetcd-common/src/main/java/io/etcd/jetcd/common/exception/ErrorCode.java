@@ -52,7 +52,7 @@ public enum ErrorCode {
 
     static {
         Map<Integer, ErrorCode> realMap = new LinkedHashMap<>();
-        for (ErrorCode errorCode : ErrorCode.values()) {
+        for (ErrorCode errorCode : values()) {
             realMap.put(errorCode.getCode(), errorCode);
         }
         errorByRpcCode = Collections.unmodifiableMap(realMap);

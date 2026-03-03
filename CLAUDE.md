@@ -3,11 +3,10 @@
 ## Build
 
 ```bash
-# Java 21 requis (le système a Java 25 qui casse certains plugins Gradle)
-JAVA_HOME=/usr/lib/jvm/jdk-21 ./gradlew build -x test
-JAVA_HOME=/usr/lib/jvm/jdk-21 ./gradlew test          # tests d'intégration (nécessitent Docker)
-JAVA_HOME=/usr/lib/jvm/jdk-21 ./gradlew spotlessApply # corriger le formatage
-JAVA_HOME=/usr/lib/jvm/jdk-21 ./gradlew :jetcd-core:pmdMain # vérifier PMD
+./gradlew build -x test
+./gradlew test          # tests d'intégration (nécessitent Docker)
+./gradlew spotlessApply # corriger le formatage
+./gradlew :jetcd-core:pmdMain # vérifier PMD
 ```
 
 ## Structure des modules

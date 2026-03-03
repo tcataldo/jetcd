@@ -26,7 +26,7 @@ import com.google.protobuf.ByteString;
  */
 public final class ByteSequence {
     public static final ByteSequence EMPTY = new ByteSequence(ByteString.EMPTY);
-    public static final ByteSequence NAMESPACE_DELIMITER = ByteSequence.from(new byte[] { '/' });
+    public static final ByteSequence NAMESPACE_DELIMITER = from(new byte[] { '/' });
 
     private final int hashVal;
     private final ByteString byteString;
