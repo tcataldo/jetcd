@@ -76,12 +76,9 @@ subprojects {
             maxFailures = 5
         }
     }
-    testing {
-        suites {
-            test {
-                useJUnitJupiter()
-            }
-        }
+
+    dependencies {
+        testRuntimeOnly libs.junitLauncher
     }
 
     testlogger {

@@ -5,6 +5,7 @@ mockito = "5.21.0"
 slf4j = "2.0.17"
 assertj = "3.27.6"
 junit = "5.13.4"
+junitPlatform = "1.13.4"
 testcontainers = "2.0.3"
 protoc = "3.25.1"
 failsafe = "3.3.2"
@@ -32,6 +33,7 @@ testRetryPlugin = "1.6.2"
 slf4j = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 junit = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junitLauncher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
 testcontainers = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
 protoc = { module = "com.google.protobuf:protoc", version.ref = "protoc" }
 failsafe = { module = "dev.failsafe:failsafe", version.ref = "failsafe" }
