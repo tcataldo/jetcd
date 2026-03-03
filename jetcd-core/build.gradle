@@ -32,7 +32,7 @@ dependencies {
 
     testImplementation libs.restAssured
     testImplementation libs.awaitility
-    testImplementation libs.commonsIo
+
     testImplementation libs.bundles.testing
 
     testRuntimeOnly libs.bundles.log4j

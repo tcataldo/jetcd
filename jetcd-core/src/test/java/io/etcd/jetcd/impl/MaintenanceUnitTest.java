@@ -18,6 +18,7 @@ package io.etcd.jetcd.impl;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.BlockingQueue;
@@ -28,7 +29,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.output.NullOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -104,7 +104,7 @@ public class MaintenanceUnitTest {
             }
         });
 
-        assertThatThrownBy(() -> maintenance.snapshot(NullOutputStream.INSTANCE).get())
+        assertThatThrownBy(() -> maintenance.snapshot(OutputStream.nullOutputStream()).get())
             .isInstanceOf(ExecutionException.class).hasCauseInstanceOf(EtcdException.class);
     }
 

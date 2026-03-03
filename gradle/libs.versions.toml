@@ -10,7 +10,7 @@ testcontainers = "2.0.3"
 protoc = "3.25.1"
 failsafe = "3.3.2"
 awaitility = "4.3.0"
-commonsIo = "2.21.0"
+
 
 autoService = "1.1.1"
 errorprone = "2.48.0"
@@ -41,7 +41,7 @@ awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" 
 picocli  = { module = "info.picocli:picocli", version.ref = "picocli"}
 restAssured = { module = "io.rest-assured:rest-assured", version.ref = "restAssured"}
 
-commonsIo = { module = "commons-io:commons-io", version.ref = "commonsIo" }
+
 
 
 mockitoCore = { module = "org.mockito:mockito-core", version.ref = "mockito" }
