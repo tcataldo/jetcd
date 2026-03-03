@@ -11,7 +11,7 @@ protoc = "3.25.1"
 failsafe = "3.3.2"
 awaitility = "4.3.0"
 commonsIo = "2.21.0"
-commonCompress = "1.28.0"
+
 autoService = "1.1.1"
 errorprone = "2.48.0"
 picocli = "4.7.7"
@@ -42,7 +42,7 @@ picocli  = { module = "info.picocli:picocli", version.ref = "picocli"}
 restAssured = { module = "io.rest-assured:rest-assured", version.ref = "restAssured"}
 
 commonsIo = { module = "commons-io:commons-io", version.ref = "commonsIo" }
-commonsCompress = { module = "org.apache.commons:commons-compress", version.ref = "commonCompress" }
+
 
 mockitoCore = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockitoJunit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }

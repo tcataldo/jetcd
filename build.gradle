@@ -82,8 +82,8 @@ subprojects {
     }
 
     testlogger {
-        theme 'mocha-parallel'
-        showStandardStreams false
+        theme = 'mocha-parallel'
+        showStandardStreams = false
     }
 
     tasks.register('allDeps', DependencyReportTask)

@@ -78,9 +78,7 @@ publishing {
 }
 
 signing {
-    required {
-        !version.endsWith('SNAPSHOT')
-    }
+    required = !version.endsWith('SNAPSHOT')
 
     if (!version.endsWith('SNAPSHOT')) {
         useGpgCmd()
