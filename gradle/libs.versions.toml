@@ -26,7 +26,7 @@ testLoggerPlugin = "4.0.0"
 protobufPlugin = "0.9.6"
 nexusPublishPlugin = "2.0.0"
 axionReleasePlugin = "1.18.17"
-testRetryPlugin = "1.6.2"
+testRetryPlugin = "1.6.4"
 
 
 [libraries]
