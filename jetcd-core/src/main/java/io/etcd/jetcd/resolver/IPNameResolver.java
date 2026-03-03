@@ -27,20 +27,17 @@ import io.etcd.jetcd.common.exception.EtcdExceptionFactory;
 import io.grpc.Attributes;
 import io.grpc.EquivalentAddressGroup;
 
-import com.google.common.base.Strings;
-import com.google.common.net.HostAndPort;
-
 public class IPNameResolver extends AbstractNameResolver {
     public static final String SCHEME = "ip";
 
-    private final List<HostAndPort> addresses;
+    private final List<HostPort> addresses;
 
     public IPNameResolver(URI targetUri) {
         super(targetUri);
 
         this.addresses = Stream.of(targetUri.getPath().split(","))
             .map(address -> address.startsWith("/") ? address.substring(1) : address)
-            .map(HostAndPort::fromString)
+            .map(HostPort::fromString)
             .collect(Collectors.toList());
     }
 
@@ -58,12 +55,43 @@ public class IPNameResolver extends AbstractNameResolver {
                     new InetSocketAddress(
                         address.getHost(),
                         address.getPortOrDefault(ETCD_CLIENT_PORT)),
-                    Strings.isNullOrEmpty(getServiceAuthority())
+                    getServiceAuthority() == null || getServiceAuthority().isEmpty()
                         ? Attributes.newBuilder()
                             .set(EquivalentAddressGroup.ATTR_AUTHORITY_OVERRIDE, address.toString())
                             .build()
                         : Attributes.EMPTY);
             })
             .collect(Collectors.toList());
+    }
+
+    private static final class HostPort {
+        private final String host;
+        private final int port;
+
+        private HostPort(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+
+        static HostPort fromString(String s) {
+            int colon = s.lastIndexOf(':');
+            if (colon < 0) {
+                return new HostPort(s, -1);
+            }
+            return new HostPort(s.substring(0, colon), Integer.parseInt(s.substring(colon + 1)));
+        }
+
+        String getHost() {
+            return host;
+        }
+
+        int getPortOrDefault(int defaultPort) {
+            return port < 0 ? defaultPort : port;
+        }
+
+        @Override
+        public String toString() {
+            return port >= 0 ? host + ":" + port : host;
+        }
     }
 }

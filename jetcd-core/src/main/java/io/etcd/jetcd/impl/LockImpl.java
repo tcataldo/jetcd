@@ -31,7 +31,7 @@ import io.etcd.jetcd.support.Util;
 import static java.util.Objects.requireNonNull;
 
 final class LockImpl extends Impl implements Lock {
-    private final LockGrpc.LockFutureStub stub;
+    private final LockGrpc.LockStub stub;
     private final ByteSequence namespace;
 
     // Lock operations are done in a context where a client is trying to implement
@@ -46,14 +46,14 @@ final class LockImpl extends Impl implements Lock {
     // (a) know (b) retry on a different server.
     // The retry on a different server should happen automatically if the connection manager is using
     // a round robin strategy.
-    private LockGrpc.LockFutureStub stubWithLeader() {
+    private LockGrpc.LockStub stubWithLeader() {
         return Util.applyRequireLeader(true, stub);
     }
 
     LockImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(LockGrpc::newFutureStub);
+        this.stub = connectionManager.newStub(LockGrpc::newStub);
         this.namespace = connectionManager.getNamespace();
     }
 
@@ -66,8 +66,8 @@ final class LockImpl extends Impl implements Lock {
             .setLease(leaseId)
             .build();
 
-        return execute(
-            () -> stubWithLeader().lock(request),
+        return this.<io.etcd.jetcd.api.lock.LockResponse, LockResponse> execute(
+            obs -> stubWithLeader().lock(request, obs),
             response -> new LockResponse(response, namespace),
             Errors::isRetryableForSafeRedoOp);
     }
@@ -81,7 +81,7 @@ final class LockImpl extends Impl implements Lock {
             .build();
 
         return execute(
-            () -> stubWithLeader().unlock(request),
+            obs -> stubWithLeader().unlock(request, obs),
             UnlockResponse::new,
             Errors::isRetryableForSafeRedoOp);
     }

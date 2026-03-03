@@ -39,12 +39,12 @@ import io.etcd.jetcd.cluster.MemberUpdateResponse;
  */
 final class ClusterImpl extends Impl implements Cluster {
 
-    private final ClusterGrpc.ClusterFutureStub stub;
+    private final ClusterGrpc.ClusterStub stub;
 
     ClusterImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(ClusterGrpc::newFutureStub);
+        this.stub = connectionManager.newStub(ClusterGrpc::newStub);
     }
 
     /**
@@ -53,7 +53,7 @@ final class ClusterImpl extends Impl implements Cluster {
     @Override
     public CompletableFuture<MemberListResponse> listMember() {
         return completable(
-            this.stub.memberList(MemberListRequest.getDefaultInstance()),
+            obs -> this.stub.memberList(MemberListRequest.getDefaultInstance(), obs),
             MemberListResponse::new);
     }
 
@@ -81,7 +81,7 @@ final class ClusterImpl extends Impl implements Cluster {
             .build();
 
         return completable(
-            this.stub.memberAdd(memberAddRequest),
+            obs -> this.stub.memberAdd(memberAddRequest, obs),
             MemberAddResponse::new);
     }
 
@@ -97,7 +97,7 @@ final class ClusterImpl extends Impl implements Cluster {
             .build();
 
         return completable(
-            this.stub.memberRemove(memberRemoveRequest),
+            obs -> this.stub.memberRemove(memberRemoveRequest, obs),
             MemberRemoveResponse::new);
     }
 
@@ -115,7 +115,7 @@ final class ClusterImpl extends Impl implements Cluster {
             .build();
 
         return completable(
-            this.stub.memberUpdate(memberUpdateRequest),
+            obs -> this.stub.memberUpdate(memberUpdateRequest, obs),
             MemberUpdateResponse::new);
     }
 
@@ -132,7 +132,7 @@ final class ClusterImpl extends Impl implements Cluster {
             .build();
 
         return completable(
-            this.stub.memberPromote(memberPromoteRequest),
+            obs -> this.stub.memberPromote(memberPromoteRequest, obs),
             MemberPromoteResponse::new);
     }
 

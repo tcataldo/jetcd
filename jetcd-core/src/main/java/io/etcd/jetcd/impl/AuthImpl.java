@@ -62,19 +62,19 @@ import static java.util.Objects.requireNonNull;
  */
 final class AuthImpl extends Impl implements Auth {
 
-    private final AuthGrpc.AuthFutureStub stub;
+    private final AuthGrpc.AuthStub stub;
 
     AuthImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(AuthGrpc::newFutureStub);
+        this.stub = connectionManager.newStub(AuthGrpc::newStub);
     }
 
     @Override
     public CompletableFuture<AuthEnableResponse> authEnable() {
         AuthEnableRequest enableRequest = AuthEnableRequest.getDefaultInstance();
         return completable(
-            this.stub.authEnable(enableRequest),
+            obs -> this.stub.authEnable(enableRequest, obs),
             AuthEnableResponse::new);
     }
 
@@ -82,7 +82,7 @@ final class AuthImpl extends Impl implements Auth {
     public CompletableFuture<AuthDisableResponse> authDisable() {
         AuthDisableRequest disableRequest = AuthDisableRequest.getDefaultInstance();
         return completable(
-            this.stub.authDisable(disableRequest),
+            obs -> this.stub.authDisable(disableRequest, obs),
             AuthDisableResponse::new);
     }
 
@@ -97,7 +97,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.userAdd(addRequest),
+            obs -> this.stub.userAdd(addRequest, obs),
             AuthUserAddResponse::new);
     }
 
@@ -110,7 +110,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.userDelete(deleteRequest),
+            obs -> this.stub.userDelete(deleteRequest, obs),
             AuthUserDeleteResponse::new);
     }
 
@@ -125,7 +125,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.userChangePassword(changePasswordRequest),
+            obs -> this.stub.userChangePassword(changePasswordRequest, obs),
             AuthUserChangePasswordResponse::new);
     }
 
@@ -138,7 +138,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.userGet(userGetRequest),
+            obs -> this.stub.userGet(userGetRequest, obs),
             AuthUserGetResponse::new);
     }
 
@@ -147,7 +147,7 @@ final class AuthImpl extends Impl implements Auth {
         AuthUserListRequest userListRequest = AuthUserListRequest.getDefaultInstance();
 
         return completable(
-            this.stub.userList(userListRequest),
+            obs -> this.stub.userList(userListRequest, obs),
             AuthUserListResponse::new);
     }
 
@@ -162,7 +162,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.userGrantRole(userGrantRoleRequest),
+            obs -> this.stub.userGrantRole(userGrantRoleRequest, obs),
             AuthUserGrantRoleResponse::new);
     }
 
@@ -177,7 +177,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.userRevokeRole(userRevokeRoleRequest),
+            obs -> this.stub.userRevokeRole(userRevokeRoleRequest, obs),
             AuthUserRevokeRoleResponse::new);
     }
 
@@ -189,7 +189,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.roleAdd(roleAddRequest),
+            obs -> this.stub.roleAdd(roleAddRequest, obs),
             AuthRoleAddResponse::new);
     }
 
@@ -229,7 +229,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.roleGrantPermission(roleGrantPermissionRequest),
+            obs -> this.stub.roleGrantPermission(roleGrantPermissionRequest, obs),
             AuthRoleGrantPermissionResponse::new);
     }
 
@@ -242,7 +242,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.roleGet(roleGetRequest),
+            obs -> this.stub.roleGet(roleGetRequest, obs),
             AuthRoleGetResponse::new);
     }
 
@@ -251,7 +251,7 @@ final class AuthImpl extends Impl implements Auth {
         AuthRoleListRequest roleListRequest = AuthRoleListRequest.getDefaultInstance();
 
         return completable(
-            this.stub.roleList(roleListRequest),
+            obs -> this.stub.roleList(roleListRequest, obs),
             AuthRoleListResponse::new);
     }
 
@@ -269,7 +269,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.roleRevokePermission(roleRevokePermissionRequest),
+            obs -> this.stub.roleRevokePermission(roleRevokePermissionRequest, obs),
             AuthRoleRevokePermissionResponse::new);
     }
 
@@ -281,7 +281,7 @@ final class AuthImpl extends Impl implements Auth {
             .build();
 
         return completable(
-            this.stub.roleDelete(roleDeleteRequest),
+            obs -> this.stub.roleDelete(roleDeleteRequest, obs),
             AuthRoleDeleteResponse::new);
     }
 }

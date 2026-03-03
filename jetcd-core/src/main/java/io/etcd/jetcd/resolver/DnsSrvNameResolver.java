@@ -20,6 +20,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.List;
 
@@ -30,8 +31,6 @@ import javax.naming.directory.InitialDirContext;
 
 import io.etcd.jetcd.common.exception.EtcdExceptionFactory;
 import io.grpc.EquivalentAddressGroup;
-
-import com.google.common.base.Splitter;
 
 @SuppressWarnings("JdkObsolete")
 public class DnsSrvNameResolver extends AbstractNameResolver {
@@ -85,7 +84,7 @@ public class DnsSrvNameResolver extends AbstractNameResolver {
 
             while (resolved.hasMore()) {
                 String record = (String) resolved.next();
-                List<String> split = Splitter.on(' ').splitToList(record);
+                List<String> split = Arrays.asList(record.split(" "));
 
                 if (split.size() >= 4) {
                     String host = split.get(3).trim();

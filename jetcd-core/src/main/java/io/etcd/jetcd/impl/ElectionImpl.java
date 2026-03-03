@@ -43,15 +43,13 @@ import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.toEtcdExceptio
 import static java.util.Objects.requireNonNull;
 
 final class ElectionImpl extends Impl implements Election {
-    private final ElectionGrpc.ElectionFutureStub stub;
-    private final ElectionGrpc.ElectionStub stubAsync;
+    private final ElectionGrpc.ElectionStub stub;
     private final ByteSequence namespace;
 
     ElectionImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(ElectionGrpc::newFutureStub);
-        this.stubAsync = connectionManager.newStub(ElectionGrpc::newStub);
+        this.stub = connectionManager.newStub(ElectionGrpc::newStub);
         this.namespace = connectionManager.getNamespace();
     }
 
@@ -72,12 +70,8 @@ final class ElectionImpl extends Impl implements Election {
     // In the paragraph above when we say "raft-leader" we are talking about the etcd server that is a leader
     // of the etcd servers cluster according to raft, we are not talking about the client that
     // happens to be the leader of an election using the election API in this file.
-    private ElectionGrpc.ElectionFutureStub stubWithLeader() {
+    private ElectionGrpc.ElectionStub stubWithLeader() {
         return Util.applyRequireLeader(true, stub);
-    }
-
-    private ElectionGrpc.ElectionStub stubAsyncWithLeader() {
-        return Util.applyRequireLeader(true, stubAsync);
     }
 
     @Override
@@ -93,7 +87,7 @@ final class ElectionImpl extends Impl implements Election {
 
         return wrapConvertException(
             execute(
-                () -> stubWithLeader().campaign(request),
+                obs -> stubWithLeader().campaign(request, obs),
                 CampaignResponse::new,
                 Errors::isRetryableForNoSafeRedoOp));
     }
@@ -116,7 +110,7 @@ final class ElectionImpl extends Impl implements Election {
 
         return wrapConvertException(
             execute(
-                () -> stubWithLeader().proclaim(request),
+                obs -> stubWithLeader().proclaim(request, obs),
                 ProclaimResponse::new,
                 Errors::isRetryableForNoSafeRedoOp));
     }
@@ -130,8 +124,8 @@ final class ElectionImpl extends Impl implements Election {
             .build();
 
         return wrapConvertException(
-            execute(
-                () -> stubWithLeader().leader(request),
+            this.<io.etcd.jetcd.api.LeaderResponse, LeaderResponse> execute(
+                obs -> stubWithLeader().leader(request, obs),
                 response -> new LeaderResponse(response, namespace),
                 Errors::isRetryableForNoSafeRedoOp));
     }
@@ -145,7 +139,7 @@ final class ElectionImpl extends Impl implements Election {
             .setName(Util.prefixNamespace(electionName, namespace))
             .build();
 
-        stubAsyncWithLeader().observe(request, new StreamObserver<io.etcd.jetcd.api.LeaderResponse>() {
+        stubWithLeader().observe(request, new StreamObserver<io.etcd.jetcd.api.LeaderResponse>() {
             @Override
             public void onNext(io.etcd.jetcd.api.LeaderResponse value) {
                 listener.onNext(new LeaderResponse(value, namespace));
@@ -179,7 +173,7 @@ final class ElectionImpl extends Impl implements Election {
 
         return wrapConvertException(
             execute(
-                () -> stubWithLeader().resign(request),
+                obs -> stubWithLeader().resign(request, obs),
                 ResignResponse::new,
                 Errors::isRetryableForNoSafeRedoOp));
     }

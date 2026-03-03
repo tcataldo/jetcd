@@ -27,8 +27,6 @@ import io.etcd.jetcd.Txn;
 import io.etcd.jetcd.api.TxnRequest;
 import io.etcd.jetcd.kv.TxnResponse;
 
-import com.google.common.annotations.VisibleForTesting;
-
 /**
  * Build an etcd transaction.
  */
@@ -38,7 +36,6 @@ public class TxnImpl implements Txn {
         return new TxnImpl(f, namespace);
     }
 
-    @VisibleForTesting
     static TxnImpl newTxn(Function<TxnRequest, CompletableFuture<TxnResponse>> f) {
         return newTxn(f, ByteSequence.EMPTY);
     }

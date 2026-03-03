@@ -25,8 +25,6 @@ import java.util.UUID;
 
 import org.testcontainers.containers.Network;
 
-import com.google.common.base.Strings;
-
 public final class Etcd {
     public static final String CONTAINER_IMAGE = "quay.io/coreos/etcd:v3.5.14";
     public static final int ETCD_CLIENT_PORT = 2379;
@@ -38,7 +36,7 @@ public final class Etcd {
 
     private static String resolveContainerImage() {
         String image = System.getenv("ETCD_IMAGE");
-        if (!Strings.isNullOrEmpty(image)) {
+        if (image != null && !image.isEmpty()) {
             return image;
         }
         return CONTAINER_IMAGE;

@@ -26,8 +26,6 @@ import io.etcd.jetcd.common.exception.EtcdExceptionFactory;
 import io.grpc.Attributes;
 import io.grpc.EquivalentAddressGroup;
 
-import com.google.common.base.Strings;
-
 public class HttpNameResolver extends AbstractNameResolver {
     public static final String SCHEME = "http";
 
@@ -52,7 +50,7 @@ public class HttpNameResolver extends AbstractNameResolver {
                 new InetSocketAddress(
                     address.getHost(),
                     address.getPort() != -1 ? address.getPort() : ETCD_CLIENT_PORT),
-                Strings.isNullOrEmpty(getServiceAuthority())
+                getServiceAuthority() == null || getServiceAuthority().isEmpty()
                     ? Attributes.newBuilder()
                         .set(EquivalentAddressGroup.ATTR_AUTHORITY_OVERRIDE, address.toString())
                         .build()

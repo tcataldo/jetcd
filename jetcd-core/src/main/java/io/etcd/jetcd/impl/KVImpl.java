@@ -43,13 +43,13 @@ import static java.util.Objects.requireNonNull;
  * Implementation of etcd kv client.
  */
 final class KVImpl extends Impl implements KV {
-    private final KVGrpc.KVFutureStub stub;
+    private final KVGrpc.KVStub stub;
     private final ByteSequence namespace;
 
     KVImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager.newStub(KVGrpc::newFutureStub);
+        this.stub = connectionManager.newStub(KVGrpc::newStub);
         this.namespace = connectionManager.getNamespace();
     }
 
@@ -63,8 +63,8 @@ final class KVImpl extends Impl implements KV {
         requireNonNull(key, "key should not be null");
         requireNonNull(value, "value should not be null");
         requireNonNull(option, "option should not be null");
-        return execute(
-            () -> stub.put(Requests.mapPutRequest(key, value, option, namespace)),
+        return this.<io.etcd.jetcd.api.PutResponse, PutResponse> execute(
+            obs -> stub.put(Requests.mapPutRequest(key, value, option, namespace), obs),
             response -> new PutResponse(response, namespace),
             option.isAutoRetry() ? Errors::isRetryableForSafeRedoOp : Errors::isRetryableForNoSafeRedoOp);
     }
@@ -79,8 +79,8 @@ final class KVImpl extends Impl implements KV {
         requireNonNull(key, "key should not be null");
         requireNonNull(option, "option should not be null");
 
-        return execute(
-            () -> stub.range(Requests.mapRangeRequest(key, option, namespace)),
+        return this.<io.etcd.jetcd.api.RangeResponse, GetResponse> execute(
+            obs -> stub.range(Requests.mapRangeRequest(key, option, namespace), obs),
             response -> new GetResponse(response, namespace),
             Errors::isRetryableForSafeRedoOp);
     }
@@ -95,8 +95,8 @@ final class KVImpl extends Impl implements KV {
         requireNonNull(key, "key should not be null");
         requireNonNull(option, "option should not be null");
 
-        return execute(
-            () -> stub.deleteRange(Requests.mapDeleteRequest(key, option, namespace)),
+        return this.<io.etcd.jetcd.api.DeleteRangeResponse, DeleteResponse> execute(
+            obs -> stub.deleteRange(Requests.mapDeleteRequest(key, option, namespace), obs),
             response -> new DeleteResponse(response, namespace),
             option.isAutoRetry() ? Errors::isRetryableForSafeRedoOp : Errors::isRetryableForNoSafeRedoOp);
     }
@@ -115,7 +115,7 @@ final class KVImpl extends Impl implements KV {
             .build();
 
         return execute(
-            () -> stub.compact(request),
+            obs -> stub.compact(request, obs),
             CompactResponse::new,
             Errors::isRetryableForSafeRedoOp);
     }
@@ -128,8 +128,8 @@ final class KVImpl extends Impl implements KV {
     @Override
     public Txn txn(TxnOption option) {
         return TxnImpl.newTxn(
-            request -> execute(
-                () -> stub.txn(request),
+            request -> this.<io.etcd.jetcd.api.TxnResponse, TxnResponse> execute(
+                obs -> stub.txn(request, obs),
                 response -> new TxnResponse(response, namespace),
                 option.isAutoRetry() ? Errors::isRetryableForSafeRedoOp : Errors::isRetryableForNoSafeRedoOp),
             namespace);

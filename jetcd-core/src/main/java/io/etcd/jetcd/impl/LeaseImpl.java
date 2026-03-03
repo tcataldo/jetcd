@@ -62,8 +62,7 @@ final class LeaseImpl extends Impl implements Lease {
      */
     private static final int DEFAULT_FIRST_KEEPALIVE_TIMEOUT_MS = 5000;
 
-    private final LeaseGrpc.LeaseFutureStub stub;
-    private final LeaseGrpc.LeaseStub leaseStub;
+    private final LeaseGrpc.LeaseStub stub;
     private final Map<Long, KeepAliveObserver> keepAlives;
     private final KeepAlive keepAlive;
     private final DeadLine deadLine;
@@ -73,8 +72,7 @@ final class LeaseImpl extends Impl implements Lease {
     LeaseImpl(ClientConnectionManager connectionManager) {
         super(connectionManager);
 
-        this.stub = connectionManager().newStub(LeaseGrpc::newFutureStub);
-        this.leaseStub = Util.applyRequireLeader(true, connectionManager().newStub(LeaseGrpc::newStub));
+        this.stub = Util.applyRequireLeader(true, connectionManager().newStub(LeaseGrpc::newStub));
         this.keepAlives = new ConcurrentHashMap<>();
         this.scheduler = Executors.newScheduledThreadPool(1, Util.createThreadFactory("jetcd-lease-", true));
         this.keepAlive = new KeepAlive();
@@ -84,10 +82,11 @@ final class LeaseImpl extends Impl implements Lease {
     @Override
     public CompletableFuture<LeaseGrantResponse> grant(long ttl) {
         return execute(
-            () -> this.stub.leaseGrant(
+            obs -> this.stub.leaseGrant(
                 LeaseGrantRequest.newBuilder()
                     .setTTL(ttl)
-                    .build()),
+                    .build(),
+                obs),
             LeaseGrantResponse::new,
             true);
     }
@@ -95,10 +94,11 @@ final class LeaseImpl extends Impl implements Lease {
     @Override
     public CompletableFuture<LeaseGrantResponse> grant(long ttl, long timeout, TimeUnit unit) {
         return execute(
-            () -> this.stub.withDeadlineAfter(timeout, unit).leaseGrant(
+            obs -> this.stub.withDeadlineAfter(timeout, unit).leaseGrant(
                 LeaseGrantRequest.newBuilder()
                     .setTTL(ttl)
-                    .build()),
+                    .build(),
+                obs),
             LeaseGrantResponse::new,
             true);
     }
@@ -106,10 +106,11 @@ final class LeaseImpl extends Impl implements Lease {
     @Override
     public CompletableFuture<LeaseRevokeResponse> revoke(long leaseId) {
         return execute(
-            () -> this.stub.leaseRevoke(
+            obs -> this.stub.leaseRevoke(
                 LeaseRevokeRequest.newBuilder()
                     .setID(leaseId)
-                    .build()),
+                    .build(),
+                obs),
             LeaseRevokeResponse::new,
             true);
     }
@@ -124,7 +125,7 @@ final class LeaseImpl extends Impl implements Lease {
             .build();
 
         return execute(
-            () -> this.stub.leaseTimeToLive(leaseTimeToLiveRequest),
+            obs -> this.stub.leaseTimeToLive(leaseTimeToLiveRequest, obs),
             LeaseTimeToLiveResponse::new,
             true);
     }
@@ -155,7 +156,7 @@ final class LeaseImpl extends Impl implements Lease {
         final CompletableFuture<LeaseKeepAliveResponse> future = new CompletableFuture<>();
         final LeaseKeepAliveRequest req = LeaseKeepAliveRequest.newBuilder().setID(leaseId).build();
 
-        StreamObserver<LeaseKeepAliveRequest> requestObserver = leaseStub.leaseKeepAlive(
+        StreamObserver<LeaseKeepAliveRequest> requestObserver = stub.leaseKeepAlive(
             new StreamObserver<io.etcd.jetcd.api.LeaseKeepAliveResponse>() {
                 @Override
                 public void onNext(io.etcd.jetcd.api.LeaseKeepAliveResponse r) {
@@ -215,7 +216,7 @@ final class LeaseImpl extends Impl implements Lease {
 
         @Override
         public void doStart() {
-            StreamObserver<LeaseKeepAliveRequest> requestObserver = leaseStub.leaseKeepAlive(
+            StreamObserver<LeaseKeepAliveRequest> requestObserver = stub.leaseKeepAlive(
                 new StreamObserver<io.etcd.jetcd.api.LeaseKeepAliveResponse>() {
                     @Override
                     public void onNext(io.etcd.jetcd.api.LeaseKeepAliveResponse r) {

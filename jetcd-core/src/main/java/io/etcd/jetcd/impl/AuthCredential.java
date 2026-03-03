@@ -18,7 +18,6 @@ package io.etcd.jetcd.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 
@@ -30,8 +29,8 @@ import io.grpc.ClientInterceptor;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.stub.MetadataUtils;
+import io.grpc.stub.StreamObserver;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 
 import static io.etcd.jetcd.Preconditions.checkArgument;
@@ -70,7 +69,7 @@ class AuthCredential extends CallCredentials {
         checkArgument(!manager.builder().user().isEmpty(), "username can not be empty.");
         checkArgument(!manager.builder().password().isEmpty(), "password can not be empty.");
 
-        AuthGrpc.AuthFutureStub authFutureStub = AuthGrpc.newFutureStub(this.manager.getChannel());
+        AuthGrpc.AuthStub authStub = AuthGrpc.newStub(this.manager.getChannel());
 
         List<ClientInterceptor> interceptorsChain = new ArrayList<>();
         if (manager.builder().authHeaders() != null) {
@@ -84,7 +83,7 @@ class AuthCredential extends CallCredentials {
         }
 
         if (!interceptorsChain.isEmpty()) {
-            authFutureStub = authFutureStub.withInterceptors(
+            authStub = authStub.withInterceptors(
                 interceptorsChain.toArray(new ClientInterceptor[0]));
         }
 
@@ -97,20 +96,24 @@ class AuthCredential extends CallCredentials {
             .build();
 
         try {
-            ListenableFuture<AuthenticateResponse> future = authFutureStub.authenticate(request);
-            future.addListener(() -> {
-                try {
-                    AuthenticateResponse h = future.get();
+            authStub.authenticate(request, new StreamObserver<AuthenticateResponse>() {
+                @Override
+                public void onNext(AuthenticateResponse h) {
                     Metadata meta = new Metadata();
                     meta.put(TOKEN, h.getToken());
-                    this.meta = meta;
-                    applier.apply(this.meta);
-                } catch (ExecutionException e) {
-                    applier.fail(Status.UNAUTHENTICATED.withCause(e.getCause()));
-                } catch (Exception e) {
-                    applier.fail(Status.UNAUTHENTICATED.withCause(e));
+                    AuthCredential.this.meta = meta;
+                    applier.apply(AuthCredential.this.meta);
                 }
-            }, Runnable::run);
+
+                @Override
+                public void onError(Throwable t) {
+                    applier.fail(Status.UNAUTHENTICATED.withCause(t));
+                }
+
+                @Override
+                public void onCompleted() {
+                }
+            });
         } catch (Exception e) {
             applier.fail(Status.UNAUTHENTICATED.withCause(e));
         }

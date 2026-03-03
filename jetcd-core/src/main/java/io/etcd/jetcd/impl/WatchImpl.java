@@ -44,8 +44,6 @@ import io.grpc.Status;
 import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 
-import com.google.common.base.Strings;
-
 import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.newClosedWatchClientException;
 import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.newCompactedException;
 import static io.etcd.jetcd.common.exception.EtcdExceptionFactory.newEtcdException;
@@ -272,7 +270,7 @@ final class WatchImpl extends Impl implements Watch {
 
                 if (response.getCompactRevision() != 0) {
                     error = newCompactedException(response.getCompactRevision());
-                } else if (Strings.isNullOrEmpty(reason)) {
+                } else if (reason == null || reason.isEmpty()) {
                     error = newEtcdException(ErrorCode.OUT_OF_RANGE,
                         "etcdserver: mvcc: required revision is a future revision");
                 } else {

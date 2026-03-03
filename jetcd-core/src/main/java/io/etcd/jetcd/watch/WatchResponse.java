@@ -24,8 +24,6 @@ import io.etcd.jetcd.KeyValue;
 import io.etcd.jetcd.api.Event;
 import io.etcd.jetcd.impl.AbstractResponse;
 
-import com.google.common.annotations.VisibleForTesting;
-
 public class WatchResponse extends AbstractResponse<io.etcd.jetcd.api.WatchResponse> {
 
     private List<WatchEvent> events;
@@ -36,7 +34,6 @@ public class WatchResponse extends AbstractResponse<io.etcd.jetcd.api.WatchRespo
         this.namespace = namespace;
     }
 
-    @VisibleForTesting
     public WatchResponse(io.etcd.jetcd.api.WatchResponse response) {
         this(response, ByteSequence.EMPTY);
     }

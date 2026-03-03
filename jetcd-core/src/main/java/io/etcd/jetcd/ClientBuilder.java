@@ -38,8 +38,6 @@ import io.grpc.netty.GrpcSslContexts;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 
-import com.google.common.base.Strings;
-
 /**
  * ClientBuilder knows how to create a Client instance.
  */
@@ -89,7 +87,7 @@ public final class ClientBuilder implements Cloneable {
      * @throws NullPointerException if target is null or one of endpoint is null
      */
     public ClientBuilder target(String target) {
-        Preconditions.checkArgument(!Strings.isNullOrEmpty(target), "target can't be null or empty");
+        Preconditions.checkArgument(target != null && !target.isEmpty(), "target can't be null or empty");
 
         this.target = target;
 
@@ -143,7 +141,7 @@ public final class ClientBuilder implements Cloneable {
             .distinct()
             .collect(Collectors.joining(","));
 
-        if (Strings.isNullOrEmpty(target)) {
+        if (target == null || target.isEmpty()) {
             throw new IllegalArgumentException("Unable to compute target from endpoints: '" + endpoints + "'");
         }
 

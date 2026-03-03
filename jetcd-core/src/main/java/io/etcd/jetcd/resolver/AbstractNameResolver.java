@@ -30,8 +30,6 @@ import io.grpc.EquivalentAddressGroup;
 import io.grpc.NameResolver;
 import io.grpc.Status;
 
-import com.google.common.base.Preconditions;
-
 public abstract class AbstractNameResolver extends NameResolver {
     public static final int ETCD_CLIENT_PORT = 2379;
 
@@ -64,7 +62,9 @@ public abstract class AbstractNameResolver extends NameResolver {
     @Override
     public void start(Listener listener) {
         synchronized (lock) {
-            Preconditions.checkState(this.listener == null, "already started");
+            if (this.listener != null) {
+                throw new IllegalStateException("already started");
+            }
             this.listener = Objects.requireNonNull(listener, "listener");
             resolve();
         }
